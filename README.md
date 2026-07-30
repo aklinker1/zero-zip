@@ -18,5 +18,6 @@ bun add @aklinker1/zero-zip
 
 ### Not Supported
 
+- Unzipping
 - Standalone directory entries
 - Unix permissions not supported
