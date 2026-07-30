@@ -4,6 +4,7 @@
   "description": "Zero dependency, tiny util for creating ZIP files",
   "type": "module",
   "sideEffects": false,
+  "license": "MIT",
   "files": [
     "dist"
   ],
