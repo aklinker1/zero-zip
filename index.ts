@@ -47,7 +47,10 @@ export function createZip(options?: ZlibOptions): Zip {
       const pathBuffer = Buffer.from(entry.path);
       const pathLen = pathBuffer.length;
       const compressedData = await deflateRawAsync(entry.buffer, options);
-      const compressedSize = compressedData.length;
+      const useStore = compressedData.length >= entry.buffer.length;
+      const finalData = useStore ? entry.buffer : compressedData;
+      const compressionMethod = useStore ? 0 : 8; // 0 = Store, 8 = Deflate
+      const compressedSize = finalData.length;
       const uncompressedSize = entry.buffer.length;
       const crc = crc32(entry.buffer);
 
@@ -58,8 +61,8 @@ export function createZip(options?: ZlibOptions): Zip {
       const localHeader = Buffer.alloc(30 + pathLen);
       w32(localHeader, 0x04034b50, 0); // Signature
       w16(localHeader, 20, 4); // Version needed (2.0)
-      w16(localHeader, generalPurposeFlags, 6); // General purpose bit flag
-      w16(localHeader, 8, 8); // Compression method (8 = Deflate)
+      w16(localHeader, generalPurposeFlags, 6);
+      w16(localHeader, compressionMethod, 8);
       w16(localHeader, 0, 10); // Last mod time
       w16(localHeader, 0, 12); // Last mod date
       w32(localHeader, crc, 14);
@@ -69,15 +72,15 @@ export function createZip(options?: ZlibOptions): Zip {
       w16(localHeader, 0, 28); // Extra field length
       pathBuffer.copy(localHeader, 30);
 
-      localHeaders.push(localHeader, compressedData);
+      localHeaders.push(localHeader, finalData);
 
       // 2. Central Directory Header (46 bytes + filename)
       const centralHeader = Buffer.alloc(46 + pathLen);
       w32(centralHeader, 0x02014b50, 0); // Signature
       w16(centralHeader, 20, 4); // Version made by
       w16(centralHeader, 20, 6); // Version needed
-      w16(centralHeader, generalPurposeFlags, 8); // General purpose bit flag
-      w16(centralHeader, 8, 10); // Compression method (8 = Deflate)
+      w16(centralHeader, generalPurposeFlags, 8);
+      w16(centralHeader, compressionMethod, 10);
       w16(centralHeader, 0, 12); // Last mod time
       w16(centralHeader, 0, 14); // Last mod date
       w32(centralHeader, crc, 16);
