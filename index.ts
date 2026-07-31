@@ -12,7 +12,7 @@ export interface Zip {
 }
 
 export function createZip(options?: ZlibOptions): Zip {
-  const entries: Array<{ path: string; buffer: Buffer }> = [];
+  const entries: Array<[path: string, buffer: Buffer]> = [];
 
   // Fast CRC-32 implementation for file integrity
   const crc32 = (buf: Buffer) => {
@@ -28,7 +28,7 @@ export function createZip(options?: ZlibOptions): Zip {
   };
 
   const addFile: Zip["addFile"] = (path, content) => {
-    entries.push({ path, buffer: fileContentToBuffer(content) });
+    entries.push([path, fileContentToBuffer(content)]);
   };
 
   // Helpers to minimize file size
@@ -43,18 +43,18 @@ export function createZip(options?: ZlibOptions): Zip {
     const centralHeaders = [];
     let offset = 0;
 
-    for (const entry of frozenEntries) {
-      const pathBuffer = Buffer.from(entry.path);
+    for (const [path, buffer] of frozenEntries) {
+      const pathBuffer = Buffer.from(path);
       const pathLen = pathBuffer.length;
-      const compressedData = await deflateRawAsync(entry.buffer, options);
-      const useStore = compressedData.length >= entry.buffer.length;
-      const finalData = useStore ? entry.buffer : compressedData;
+      const compressedData = await deflateRawAsync(buffer, options);
+      const useStore = compressedData.length >= buffer.length;
+      const finalData = useStore ? buffer : compressedData;
       const compressionMethod = useStore ? 0 : 8; // 0 = Store, 8 = Deflate
       const compressedSize = finalData.length;
-      const uncompressedSize = entry.buffer.length;
-      const crc = crc32(entry.buffer);
+      const uncompressedSize = buffer.length;
+      const crc = crc32(buffer);
 
-      const hasUnicode = /[^\x00-\x7F]/.test(entry.path);
+      const hasUnicode = /[^\x00-\x7F]/.test(path);
       const generalPurposeFlags = hasUnicode ? 0x0800 : 0;
 
       // 1. Local File Header (30 bytes + filename + compressed data)
