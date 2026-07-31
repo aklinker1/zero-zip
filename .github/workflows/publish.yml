@@ -1,0 +1,57 @@
+name: Publish
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Blank (auto), a version (1.4.1), or major/minor/patch
+        type: string
+      dryRun:
+        description: Dry Run?
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    name: Validate
+    uses: "./.github/workflows/validate.yml"
+    secrets: inherit
+    if: ${{ inputs.dryRun != true }}
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-24.04
+    needs: validate
+    # Allow dry runs to skip validation but still run this job
+    if: |
+      always() &&
+      (needs.validate.result == 'success' || needs.validate.result == 'skipped')
+    permissions:
+      contents: write # Allow pushing
+      id-token: write # Enable OIDC for NPM and JSR
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Setup Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Update NPM for Provence
+        run: sudo npm i -g npm@latest
+      - name: Bump and Release
+        uses: aklinker1/zero-changelog/actions/release@b6fcca17cebfc45f996b80fe5926da924d8441f8 # v0.2.1
+        with:
+          bump: ${{ inputs.bump }}
+          publishCommands: |-
+            mv README.md GITHUB-README.md
+            mv NPM-README.md README.md
+            npm publish
+            mv README.md NPM-README.md
+            mv GITHUB-README.md README.md
+            bunx jsr publish --allow-dirty
+          dryRun: ${{ inputs.dryRun }}
+          dryRunPublishCommands: |-
+            npm publish --dry-run
+            bunx jsr publish --dry-run --allow-dirty
+          githubToken: ${{ secrets.GITHUB_TOKEN }}

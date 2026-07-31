@@ -1,0 +1,10 @@
+{
+  "$schema": "https://jsr.io/schema/config-file.v1.json",
+  "name": "@aklinker1/zero-zip",
+  "version": "1.0.0",
+  "exports": "./index.ts",
+  "license": "MIT",
+  "publish": {
+    "include": ["index.ts", "README.md"]
+  }
+}

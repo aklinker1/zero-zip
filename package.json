@@ -17,6 +17,7 @@
   "scripts": {
     "check": "bun run build && check",
     "build": "tsdown index.ts --minify",
+    "test": "bun test",
     "prepack": "bun run build"
   },
   "devDependencies": {
