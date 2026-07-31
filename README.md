@@ -12,7 +12,9 @@ Zero dependency, tiny util for creating ZIP files.
 </div>
 
 ```sh
-bun add @aklinker1/zero-zip
+pnpm add @aklinker1/zero-zip
+bun  add @aklinker1/zero-zip
+deno add @aklinker1/zero-zip
 ```
 
 ## Usage
