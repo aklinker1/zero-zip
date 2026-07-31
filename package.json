@@ -1,6 +1,6 @@
 {
   "name": "@aklinker1/zero-zip",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero dependency, tiny util for creating ZIP files",
   "type": "module",
   "sideEffects": false,
