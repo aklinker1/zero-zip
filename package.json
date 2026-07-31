@@ -18,6 +18,7 @@
     "check": "bun run build && check",
     "build": "tsdown index.ts --minify",
     "test": "bun test",
+    "bench:memory": "bun run bench/memory.ts",
     "prepack": "bun run build"
   },
   "devDependencies": {
