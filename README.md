@@ -30,7 +30,9 @@ await writeFile("example.zip", buffer)
 
 ## Supported Runtimes
 
-- ✅ Node, Deno, Bun - any runtime with `node:zlib`
+Any runtime with access to `node:zlib`:
+
+- ✅ Node, Deno, Bun
 - ❌ Browser
 
 ## Features
@@ -42,4 +44,4 @@ await writeFile("example.zip", buffer)
 
 - Unzipping
 - Standalone directory entries
-- Unix permissions not supported
+- Unix permissions are not preserved
