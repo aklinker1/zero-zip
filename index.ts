@@ -97,7 +97,7 @@ export function createZip(options?: ZlibOptions): Zip {
 
       centralHeaders.push(centralHeader);
 
-      offset += localHeader.length + compressedData.length;
+      offset += localHeader.length + finalData.length;
     }
 
     const centralDirOffset = offset;
