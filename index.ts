@@ -40,7 +40,15 @@ export function createZip(options?: ZlibOptions): Zip {
   const toBuffer: Zip["toBuffer"] = async () => {
     const frozenEntries = entries.slice();
     const processed: Array<
-      [Buffer, Buffer, number, number, number, number, number]
+      [
+        pathBuf: Buffer,
+        data: Buffer,
+        method: number,
+        crc: number,
+        cSize: number,
+        uSize: number,
+        flags: number,
+      ]
     > = [];
     let totalSize = 22; // EOCD
 
