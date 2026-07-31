@@ -39,83 +39,87 @@ export function createZip(options?: ZlibOptions): Zip {
 
   const toBuffer: Zip["toBuffer"] = async () => {
     const frozenEntries = entries.slice();
-    const localHeaders = [];
-    const centralHeaders = [];
-    let offset = 0;
+    const processed: Array<
+      [Buffer, Buffer, number, number, number, number, number]
+    > = [];
+    let totalSize = 22; // EOCD
 
     for (const entry of frozenEntries) {
-      const pathBuffer = Buffer.from(entry.path);
-      const pathLen = pathBuffer.length;
-      const compressedData = await deflateRawAsync(entry.buffer, options);
-      const useStore = compressedData.length >= entry.buffer.length;
-      const finalData = useStore ? entry.buffer : compressedData;
-      const compressionMethod = useStore ? 0 : 8; // 0 = Store, 8 = Deflate
-      const compressedSize = finalData.length;
-      const uncompressedSize = entry.buffer.length;
-      const crc = crc32(entry.buffer);
+      const pathBuf = Buffer.from(entry.path);
+      const compressed = await deflateRawAsync(entry.buffer, options);
+      const useStore = compressed.length >= entry.buffer.length;
+      const data = useStore ? entry.buffer : compressed;
+      const flags = /[^\x00-\x7F]/.test(entry.path) ? 0x0800 : 0;
 
-      const hasUnicode = /[^\x00-\x7F]/.test(entry.path);
-      const generalPurposeFlags = hasUnicode ? 0x0800 : 0;
+      processed.push([
+        pathBuf,
+        data,
+        useStore ? 0 : 8,
+        crc32(entry.buffer),
+        data.length,
+        entry.buffer.length,
+        flags,
+      ]);
 
-      // 1. Local File Header (30 bytes + filename + compressed data)
-      const localHeader = Buffer.alloc(30 + pathLen);
-      w32(localHeader, 0x04034b50, 0); // Signature
-      w16(localHeader, 20, 4); // Version needed (2.0)
-      w16(localHeader, generalPurposeFlags, 6);
-      w16(localHeader, compressionMethod, 8);
-      w16(localHeader, 0, 10); // Last mod time
-      w16(localHeader, 0, 12); // Last mod date
-      w32(localHeader, crc, 14);
-      w32(localHeader, compressedSize, 18);
-      w32(localHeader, uncompressedSize, 22);
-      w16(localHeader, pathLen, 26);
-      w16(localHeader, 0, 28); // Extra field length
-      pathBuffer.copy(localHeader, 30);
-
-      localHeaders.push(localHeader, finalData);
-
-      // 2. Central Directory Header (46 bytes + filename)
-      const centralHeader = Buffer.alloc(46 + pathLen);
-      w32(centralHeader, 0x02014b50, 0); // Signature
-      w16(centralHeader, 20, 4); // Version made by
-      w16(centralHeader, 20, 6); // Version needed
-      w16(centralHeader, generalPurposeFlags, 8);
-      w16(centralHeader, compressionMethod, 10);
-      w16(centralHeader, 0, 12); // Last mod time
-      w16(centralHeader, 0, 14); // Last mod date
-      w32(centralHeader, crc, 16);
-      w32(centralHeader, compressedSize, 20);
-      w32(centralHeader, uncompressedSize, 24);
-      w16(centralHeader, pathLen, 28);
-      w16(centralHeader, 0, 30); // Extra field length
-      w16(centralHeader, 0, 32); // Comment length
-      w16(centralHeader, 0, 34); // Disk number start
-      w16(centralHeader, 0, 36); // Internal file attributes
-      w32(centralHeader, 0, 38); // External file attributes
-      w32(centralHeader, offset, 42); // Relative offset of local header
-      pathBuffer.copy(centralHeader, 46);
-
-      centralHeaders.push(centralHeader);
-
-      offset += localHeader.length + finalData.length;
+      totalSize += 76 + pathBuf.length * 2 + data.length;
     }
 
-    const centralDirOffset = offset;
-    let centralDirSize = 0;
-    for (const ch of centralHeaders) centralDirSize += ch.length;
+    const result = Buffer.alloc(totalSize);
+    let pos = 0;
+    let localOff = 0;
 
-    // 3. End of Central Directory Record (EOCD - 22 bytes)
-    const eocd = Buffer.alloc(22);
-    w32(eocd, 0x06054b50, 0); // Signature
-    w16(eocd, 0, 4); // Number of this disk
-    w16(eocd, 0, 6); // Disk with start of CD
-    w16(eocd, frozenEntries.length, 8); // Total entries on this disk
-    w16(eocd, frozenEntries.length, 10); // Total entries
-    w32(eocd, centralDirSize, 12); // Size of CD
-    w32(eocd, centralDirOffset, 16); // Offset of CD
-    w16(eocd, 0, 20); // Comment length
+    for (const [pathBuf, data, method, crc, cSize, uSize, flags] of processed) {
+      const pLen = pathBuf.length;
+      // Local header
+      w32(result, 0x04034b50, pos);
+      w16(result, 20, pos + 4);
+      w16(result, flags, pos + 6);
+      w16(result, method, pos + 8);
+      w32(result, 0, pos + 10);
+      w32(result, crc, pos + 14);
+      w32(result, cSize, pos + 18);
+      w32(result, uSize, pos + 22);
+      w16(result, pLen, pos + 26);
+      w16(result, 0, pos + 28);
+      pathBuf.copy(result, pos + 30);
+      pos += 30 + pLen;
+      data.copy(result, pos);
+      pos += data.length;
+    }
 
-    return Buffer.concat([...localHeaders, ...centralHeaders, eocd]);
+    const cdStart = pos;
+
+    for (const [pathBuf, , method, crc, cSize, uSize, flags] of processed) {
+      const pLen = pathBuf.length;
+      // Central directory header
+      w32(result, 0x02014b50, pos);
+      w32(result, 0x00140014, pos + 4);
+      w16(result, flags, pos + 8);
+      w16(result, method, pos + 10);
+      w32(result, 0, pos + 12);
+      w32(result, crc, pos + 16);
+      w32(result, cSize, pos + 20);
+      w32(result, uSize, pos + 24);
+      w16(result, pLen, pos + 28);
+      w32(result, 0, pos + 30);
+      w32(result, 0, pos + 34);
+      w32(result, 0, pos + 38);
+      w32(result, localOff, pos + 42);
+      pathBuf.copy(result, pos + 46);
+      localOff += 30 + pLen + cSize;
+      pos += 46 + pLen;
+    }
+
+    // EOCD
+    w32(result, 0x06054b50, pos);
+    w32(result, 0, pos + 4);
+    w16(result, processed.length, pos + 8);
+    w16(result, processed.length, pos + 10);
+    w32(result, pos - cdStart, pos + 12);
+    w32(result, cdStart, pos + 16);
+    w16(result, 0, pos + 20);
+
+    return result;
   };
 
   return { addFile, toBuffer };
