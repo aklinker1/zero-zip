@@ -42,8 +42,15 @@ const TEXT_PHRASE =
   "The quick brown fox jumps over the lazy dog. Zero-zip memory benchmark.\n";
 
 function makeTextContent(size: number): Buffer {
-  const repeats = Math.ceil(size / TEXT_PHRASE.length);
-  return Buffer.from(TEXT_PHRASE.repeat(repeats), "utf8").subarray(0, size);
+  const phrase = Buffer.from(TEXT_PHRASE, "utf8");
+  const buf = Buffer.allocUnsafe(size);
+  let offset = 0;
+  while (offset < size) {
+    const n = Math.min(phrase.length, size - offset);
+    phrase.copy(buf, offset, 0, n);
+    offset += n;
+  }
+  return buf;
 }
 
 function makeRandomContent(size: number): Buffer {
